@@ -28,12 +28,11 @@ precio_oro_df = pd.read_excel(Ruta_Precio_Oro, sheet_name="Datos", skiprows=[1])
 print(type(precio_oro_df))
 
 print(precio_oro_df.head())
-print(precio_oro_df.info())
 
 precio_oro_df.index = pd.to_datetime(precio_oro_df["Fecha"])
 # %%Creacion Series de tiempo
 
-#La serie de tiempo se va a llamar precio_oro_serie y se va a crear a partir de la columna "Precio" del DataFrame precio_oro_df.
+#La serie de tiempo se va a llamar precio_serie y se va a crear a partir de la columna "Precio" del DataFrame precio_oro_df.
 precio_serie = precio_oro_df["Precio"].copy()
 precio_serie = pd.to_numeric(precio_serie, errors="coerce")
 precio_serie = precio_serie.dropna()
@@ -332,4 +331,4 @@ plt.fill_between(
 )
 plt.title("Grafico Pronostico")
 plt.show()
-# %%Fin
+# %%

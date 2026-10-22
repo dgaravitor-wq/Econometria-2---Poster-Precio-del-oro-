@@ -28,6 +28,7 @@ precio_oro_df = pd.read_excel(Ruta_Precio_Oro, sheet_name="Datos", skiprows=[1])
 print(type(precio_oro_df))
 
 print(precio_oro_df.head())
+print(precio_oro_df.tail())
 print(precio_oro_df.info())
 
 precio_oro_df.index = pd.to_datetime(precio_oro_df["Fecha"])

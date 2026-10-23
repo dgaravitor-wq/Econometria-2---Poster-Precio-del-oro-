@@ -19,7 +19,7 @@ from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
 # %% Base de datos
 
 #Obtener ruta de directorio
-Base_Dir = Path(__file__).resolve().parent    #__file__ hace referencia al archivo actual de pyhton
+Base_Dir = Path(__file__).resolve().parent  
 
 #Rutas de la base de datos
 Ruta_Precio_Oro = Base_Dir / "Base de datos - Poster.xlsx"
@@ -229,8 +229,8 @@ type(residuales)
 #Grafico de los resuduales
 
 plt.figure(figsize=(12,6))
-plt.plot(residuales.iloc[2:]) 
-plt.title("Grafico Residuales modelo ARIMA(0,1,1)")
+plt.plot(residuales.iloc[2:])
+plt.title("Grafico Residuales modelo ARIMA(1,1,0)")
 plt.xlabel("Fecha")
 plt.ylabel("Valor")
 plt.grid(True)
@@ -366,8 +366,8 @@ residuales_boot = residuales.iloc[2:].to_numpy()
 residuales_boot = residuales_boot - residuales_boot.mean()
 
 # Condiciones iniciales históricas
-y_T = np.log(precio_serie.iloc[-1])                                    # Último nivel en logaritmo
-dy_T = np.log(precio_serie.iloc[-1]) - np.log(precio_serie.iloc[-2])   # Última diferencia logarítmica (Δy_T)
+y_T = np.log(precio_serie.iloc[-1])                          
+dy_T = np.log(precio_serie.iloc[-1]) - np.log(precio_serie.iloc[-2])  
 
 e = rng.choice(residuales_boot, size=(N_SIM, H), replace=True)
 dy = np.zeros((N_SIM, H))

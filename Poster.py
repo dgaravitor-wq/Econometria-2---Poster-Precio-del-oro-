@@ -39,9 +39,14 @@ precio_serie = precio_oro_df["Precio"].copy()
 precio_serie = pd.to_numeric(precio_serie, errors="coerce")
 precio_serie = precio_serie.dropna()
 
+
+precio_serie.index.freq = "MS"
+precio_serie = pd.to_numeric(precio_oro_df["Precio"], errors="coerce").dropna()
+
 print(precio_serie.head())
 print(type(precio_serie))
 print(precio_serie.describe())
+
 # %%=========================
 #   PASO 1: Idetificacion
 #===========================
@@ -153,46 +158,59 @@ if adf_result_logdiff[1] < 0.05:
     print("ADF: Rechazamos H0. La serie log-diferenciada es estacionaria según el test ADF.")
 else:
     print("ADF: No rechazamos H0. La serie log-diferenciada no es estacionaria según el test ADF.")
-    #Dado que la FAC 
-# %% Criterios de informacion AIC y BIC
-# %% Criterios de información AIC y BIC (Corregido)
-modelos_candidatos = [(1,1,0),
-                      (0,1,1),
-                      (1,1,1)]
-
-resultados = []
-
-for order in modelos_candidatos:
-    modelo = SARIMAX(
-        np.log(precio_serie),
-        order=order,
-        trend="c",   # Preguntar al monitor si la prueba de criterios de informacion no esta bien si ponemos lo de invertibility y stationarity = false 
-    )
-    resultado = modelo.fit(disp=False)
-    resultados.append({
-        "Modelo": f"ARIMA{order}",
-        "AIC": resultado.aic,
-        "BIC": resultado.bic,
-        "log-likelihood": resultado.llf
-    })
-
-resultados_IC = pd.DataFrame(resultados)
-resultados_IC = resultados_IC.sort_values(by="AIC").reset_index(drop=True)
-
-print("\nResultados homogéneos de los modelos ARIMA:")
-print(resultados_IC)
 # %%==================
 #    2. ESTIMACION
 #======================
+#Candiadto 1
+
+modelo_ARIMA110 = SARIMAX(
+    np.log(precio_serie),
+    order = (1,1,0),
+    trend = "c",
+    enforce_invertibility = False,
+    enforce_stationarity = False
+)
+type(modelo_ARIMA110)
+
+#Estimar el modelo
+estimacion_ARIMA110 = modelo_ARIMA110.fit(disp=False)
+
+type(estimacion_ARIMA110)
+
+#Resultados estimacion
+print(estimacion_ARIMA110.summary())
+
+#%%
+#Candiadto 2
+
+modelo_ARIMA111 = SARIMAX(
+    np.log(precio_serie),
+    order = (1,1,1),
+    trend = "c",
+    enforce_invertibility = False,
+    enforce_stationarity = False
+)
+type(modelo_ARIMA111)
+
+#Estimar el modelo
+estimacion_ARIMA111 = modelo_ARIMA111.fit(disp=False)
+
+type(estimacion_ARIMA111)
+
+#Resultados estimacion
+print(estimacion_ARIMA111.summary())
+
+#%%
+#Candiadto 3
 
 modelo_ARIMA011 = SARIMAX(
     np.log(precio_serie),
     order = (0,1,1),
     trend = "c",
-    enforce_stationarity = False,
-    enforce_invertibility = False  #PREGUNTAR AL MONITOR QUE PUEDE PASAR SI PONGO O QUITO ESTO; ACA O EN EL TEST DE CRITERIOS DE INFORMACION
+    enforce_invertibility = False,
+    enforce_stationarity = False
 )
-type(modelo_ARIMA011)
+type(modelo_ARIMA110)
 
 #Estimar el modelo
 estimacion_ARIMA011 = modelo_ARIMA011.fit(disp=False)
@@ -205,14 +223,14 @@ print(estimacion_ARIMA011.summary())
 #  3. VALIDACION DE SUPUESTOS
 #=============================
 
-residuales = estimacion_ARIMA011.resid.dropna()
+residuales = estimacion_ARIMA110.resid.dropna()
 type(residuales)
 
 #Grafico de los resuduales
 
 plt.figure(figsize=(12,6))
-plt.plot(residuales.iloc[1:-1]) 
-plt.title("Grafico Residuales modelo ARIMA(1,1,0)")
+plt.plot(residuales.iloc[2:]) 
+plt.title("Grafico Residuales modelo ARIMA(0,1,1)")
 plt.xlabel("Fecha")
 plt.ylabel("Valor")
 plt.grid(True)
@@ -286,7 +304,7 @@ print("LM p-Value:", arch_test[1])
 # %%Q-Q plot de los residuos
 
 plt.figure(figsize=(7,7))
-probplot(residuales.iloc[1:-1], dist="norm", plot=plt)
+probplot(residuales.iloc[2:], dist="norm", plot=plt)
 plt.title("Q-Q plot de los resuduos")
 plt.grid(True)
 plt.show()
@@ -294,7 +312,7 @@ plt.show()
 
 # %%Test Jarque-Bera
 
-JB_test =  jarque_bera(residuales.iloc[1:-1])
+JB_test =  jarque_bera(residuales.iloc[2:])
 
 print("Prueba Jarque-Bera")
 print("Estadistico:", JB_test[0])
@@ -303,7 +321,7 @@ print("P-Value:", JB_test[1])
 #   4. PRONOSTICO
 #=====================
 
-pronostico_log = estimacion_ARIMA011.get_forecast(steps=10)
+pronostico_log = estimacion_ARIMA110.get_forecast(steps=10)
 
 pronostico_puntual_log = pronostico_log.predicted_mean
 varianza_pronostico_log = pronostico_log.var_pred_mean
@@ -325,6 +343,7 @@ print(tabla_pronosticos)
 plt.figure(figsize=(12,6))
 plt.plot(precio_serie, label="Datos historicos")
 plt.plot(pronostico_nivel, color="Red", label = "Pronostico")
+plt.legend()
 plt.fill_between(
     pronostico_nivel.index,
     intervalo_nivel.iloc[:,0],
@@ -333,6 +352,70 @@ plt.fill_between(
     alpha=0.3,
     label="Intervalo de confianza"
 )
-plt.title("Grafico Pronostico")
+#%%  BOOTSTRAP
+N_SIM = 10_000 
+H = len(pronostico_nivel)
+rng = np.random.default_rng(2026)
+
+# Extraer parámetros del ARIMA(1,1,0)
+c = estimacion_ARIMA110.params["intercept"]
+phi1 = estimacion_ARIMA110.params["ar.L1"]
+
+# Residuales desde la observación 2 (omitimos las 2 primeras por la inicialización) y centrados en cero
+residuales_boot = residuales.iloc[2:].to_numpy()
+residuales_boot = residuales_boot - residuales_boot.mean()
+
+# Condiciones iniciales históricas
+y_T = np.log(precio_serie.iloc[-1])                                    # Último nivel en logaritmo
+dy_T = np.log(precio_serie.iloc[-1]) - np.log(precio_serie.iloc[-2])   # Última diferencia logarítmica (Δy_T)
+
+e = rng.choice(residuales_boot, size=(N_SIM, H), replace=True)
+dy = np.zeros((N_SIM, H))
+dy[:, 0] = c + phi1 * dy_T + e[:, 0]
+for h in range(1, H):
+    dy[:, h] = c + phi1 * dy[:, h-1] + e[:, h]
+
+# 3) Reconstrucción de la serie en escala original (Nivel de precios)
+trayectorias = np.exp(y_T + np.cumsum(dy, axis=1))
+
+# Métricas puntuales y percentiles
+boot_puntual = trayectorias.mean(axis=0)
+boot_inf, boot_sup = np.percentile(trayectorias, [2.5, 97.5], axis=0)
+
+fechas_pronostico = pronostico_nivel.index
+
+# %% Gráfico del pronóstico con intervalos bootstrap vs. normal
+
+plt.figure(figsize=(12, 6))
+plt.plot(precio_serie, label="Datos históricos", color="darkblue")
+plt.plot(fechas_pronostico, boot_puntual, color="red", label="Pronóstico (media bootstrap)")
+plt.fill_between(
+    fechas_pronostico, boot_inf, boot_sup,
+    color="orange", alpha=0.3, label="Intervalo 95% bootstrap"
+)
+plt.plot(fechas_pronostico, intervalo_nivel.iloc[:, 0], color="gray",
+         linestyle="--", linewidth=1, label="Intervalo 95% normal")
+plt.plot(fechas_pronostico, intervalo_nivel.iloc[:, 1], color="gray",
+         linestyle="--", linewidth=1)
+plt.title(f"Pronóstico ARIMA(1,1,0) a {H} períodos: Bootstrap vs. Normal")
+plt.xlabel("Fecha")
+plt.ylabel("Precio")
+plt.legend()
+plt.grid(True)
 plt.show()
+
+# %% Tabla comparativa de pronósticos
+
+tabla_bootstrap = pd.DataFrame({
+    "Periodo": [d.strftime("%Y-%m") if hasattr(d, "strftime") else str(d) for d in fechas_pronostico],
+    "Pronóstico (Bootstrap)": boot_puntual,
+    "Inferior (Bootstrap)": boot_inf,
+    "Superior (Bootstrap)": boot_sup,
+    "Inferior (Normal)": intervalo_nivel.iloc[:, 0].values,
+    "Superior (Normal)": intervalo_nivel.iloc[:, 1].values,
+}, index=fechas_pronostico)
+
+print("\n--- Tabla Comparativa de Pronósticos ---")
+print(tabla_bootstrap.round(2))
+
 # %%Fin
